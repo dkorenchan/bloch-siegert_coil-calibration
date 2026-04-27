@@ -1,0 +1,183 @@
+ function [w1_Hz,Ampls,Rsq] = BSXcoilCal_CPMG 
+
+% Initially written 2/10/2025 by DK as BSXcoilCal.m
+% Updated 2/13/2025 by DK
+% Ported over to current function by DK on 3/30/26
+
+% This function takes data from a Bloch-Siegert X-nuclear coil calibration 
+% (CPMG-like experient with an off-resonance pulse applied during every 
+% other echo), and it calculates the nutation frequency as a 
+% function of the pulse amplitude using the Bloch-Siegert shift dependence 
+% of the signal phase
+%
+% INPUTS:   NONE 
+%
+% OUTPUTS:  
+%   w1_Hz           --  Vector of the measured B1 value at each saturation
+%                       offset, in units of Hz
+%   Ampls           --  Vector containing the linear amplitude factors used
+%                       for the Bloch-Siegert pulses in each measurement
+%   Rsq             --  R-squared fitting statistic for each value of w1_Hz
+
+% Load the data and the offsets in Hz
+[rawdata,hdr,~,fname]=Read_Tecmag_DK;
+disp('Reading in amplitudes and timings from table in header...')
+tableVals=Read_Tecmag_Header_Table(fname,{'rf1:2'});
+HoffsetHz=abs(hdr.ob_freq(1)*1e6);
+XoffsetHz=abs(hdr.ob_freq(3)*1e6);
+Ampls=tableVals{1}';
+
+disp('Reading in Bloch-Siegert pulse duration and number of loops from header...')
+[~,seqPars]=Read_TNT_seqPars(fname,true);
+BStime = seqPars.Dashboard.Sequence.BSpw;
+numechoes = seqPars.Dashboard.Sequence.Nloops;
+
+% % Check that rawdata has dimensions (spectral,offset,TE)
+% if size(rawdata,2)~=length(offsetsHz) && size(rawdata,2)==length(delaysS)
+%     rawdata=permute(rawdata,[1,3,2]);
+% end
+
+% See if not all offsets were measured
+if size(rawdata,3)<length(Ampls)
+    Ampls=Ampls(1:size(rawdata,3));
+end
+
+% % Get the time axis data 
+% echo_str = inputdlg({'What is the B-S pulse duration, in ms?','How many loops with a B-S pulse?'});
+% BStime = str2double(echo_str{1})/1000;
+% numechoes = str2double(echo_str{2});
+
+% Double-check size of data: should be (npoints,Nechoes,Noffsets) 
+if size(rawdata,1) ~= hdr.acq_points
+    warning('Data was not formatted as (points) x (echoes) x (offsets)! Reshaping...')
+    rawdata = reshape(rawdata,hdr.acq_points,numechoes,[]);
+end
+
+delaysS = BStime:BStime:(BStime*numechoes);
+
+% Remove 0's at the end and the first point
+
+data = rawdata;
+index = find(abs(data(:,1,1))==0,1);
+data(index:end,:,:) = [];
+
+data(1,:,:) = [];
+
+% Unwrap the phase of the points in each echo
+echodata = squeeze(angle(mean(data,1)));
+phaseRad = unwrap(echodata,[],1);
+
+% Then go through all amplitude valuess, phase-unwrap so that we get a good  
+% linear change in phase, and fit to obtain the Bloch-Siegert shift 
+% (in rad/s)
+disp('Fitting to determine the Bloch-Siegert shift at each B1 amplitude setting...')
+w_BS=zeros(size(phaseRad,2),1);
+CI_BS=zeros(size(phaseRad,2),2);
+Rsq=zeros(size(phaseRad,2),1);
+fitdels=delaysS';
+
+for ii=1:size(phaseRad,2)
+    fitpts=unwrap(squeeze(phaseRad(:,ii)));
+%     % Keep only the points where all FID pts contributing to the phase are
+%     % above the SNR threshold
+%     SNRthresh=3; %SNR threshold
+%     FIDsignal=squeeze(abs(rawdata(pts,ii,:)));
+%     FIDnoise=std(squeeze(rawdata(end-42:end-32,ii,:)),0,1); %last 10 points of each FID
+%     SNRtPass=logical(prod(FIDsignal>SNRthresh*repmat(FIDnoise,length(pts),1),1));
+%     fitpts=fitpts(SNRtPass);
+%     fitdels=delaysS(SNRtPass);
+
+    % See if further unwrapping is required, and perform
+    dS=diff(fitpts);
+    dT=diff(fitdels);
+    ptwiseSlp=dS./dT;
+
+    %% DK: MAY NEED TO FIX THIS PART
+    % Detect jumps in the pointwise slope, defined as a change in slope 
+    % within a certain percentage (thresh) of the initial slope
+    thresh=0.5;
+    slpJumps=(abs(mean(ptwiseSlp(1:3))-ptwiseSlp)>abs(mean(ptwiseSlp(1:3))...
+        *(1+thresh)));
+    % Fit the slope of the first 3 points 
+%     preFitIdx=find(slpJumps,1,'first');
+    preFitIdx=3;
+    precurve=fit(fitdels(1:preFitIdx),fitpts(1:preFitIdx),'poly1');
+    precoeffs=coeffvalues(precurve);
+    preSlp=precoeffs(1);
+    
+    for jj=find(slpJumps)'
+        % Shift all points after the slope jump to match the initial 
+        % pointwise slope
+        n2pis=round((preSlp*(fitdels(jj+1:end)-fitdels(jj))...
+            -(fitpts(jj+1:end)-fitpts(jj)))./2./pi); 
+        add2pis=n2pis*2*pi;  
+        fitpts(jj+1:end)=fitpts(jj+1:end)+add2pis;
+    end
+
+    % Then, fit the curve to a linear function
+    [curve,gof]=fit(fitdels,fitpts,'poly1');
+    coeffs=coeffvalues(curve);
+    w_BS(ii)=abs(coeffs(1));
+    CIraw=confint(curve);
+    CI_BS(ii,:)=abs(CIraw(:,1)); %95% confidence bounds of slope
+    Rsq(ii)=gof.rsquare;
+    
+    % Plot each amplitude
+    figure; plot(curve,fitdels,fitpts);
+    title(['Bloch-Siegert fitting, F3 ampl = ' num2str(Ampls(ii))]);
+    xlabel('Delay [s]');
+    ylabel('Phase [rad]');
+end
+
+% Reorder CI_BS pairs so that the smaller value is in the 1st column
+for ii=1:size(CI_BS,1)
+    if CI_BS(ii,1)>CI_BS(ii,2)
+        CI_BS(ii,:)=CI_BS(ii,[2,1]);
+    end
+end
+
+% Finally, calculate omega_1 (in Hz) using the relevant equation
+disp('Calculating the B1 in Hz at each amplitude setting...')
+
+% Calculate offset difference between 1H and both the positive and negative
+% X-nuclear frequencies
+DoffPos=abs(HoffsetHz-XoffsetHz);
+DoffNeg=abs(HoffsetHz+XoffsetHz);
+DoffEff=(1./DoffNeg+1./DoffPos).^-1; %effective offset, as if from one field component
+
+w_BS_Hz=w_BS./(2*pi);
+% w1_Hz=sqrt(w_BS_Hz*2.*DoffNeg);
+w1_Hz=sqrt(w_BS_Hz*2.*DoffEff);
+
+CI_BS_Hz=CI_BS./(2*pi);
+% CI_w1_Hz=sqrt(CI_BS_Hz*2.*repmat(abs(offsetHz),numel(Ampls),2));
+CI_w1_Hz=sqrt(CI_BS_Hz*2.*repmat(DoffEff,numel(Ampls),2));
+CI_w1_Hz_neg=w1_Hz-squeeze(CI_w1_Hz(:,1));
+CI_w1_Hz_pos=squeeze(CI_w1_Hz(:,2))-w1_Hz;
+
+% Identify points where the BS shift assumptions might be invalid
+% BSthresh=5;
+% BSvalid=(abs(w1_Hz*BSthresh)<=abs(offsetsHz));
+% BSinvalid=(abs(w1_Hz*BSthresh)>abs(offsetsHz));
+BSmaxangle=3; %maximum w_eff angle where Bloch-Siegert valid, in degrees
+BSvalid=(abs(atand(w1_Hz./DoffPos))<=BSmaxangle);
+% BSinvalid=(abs(atand(w1_Hz./DoffPos))>BSmaxangle);
+if sum(~BSvalid)>0
+    warning(['Some points in calibration curve may not fulfill '...
+        'Bloch-Siegert assumptions! (i.e. w_eff angle > ' num2str(BSmaxangle) char(176)])
+end
+
+% Plot results
+figure; errorbar(Ampls(BSvalid),w1_Hz(BSvalid),...
+    CI_w1_Hz_neg(BSvalid),CI_w1_Hz_pos(BSvalid),'bo'); 
+if sum(~BSvalid)>0
+    hold on; errorbar(Ampls(~BSvalid),w1_Hz(~BSvalid),...
+        CI_w1_Hz_neg(~BSvalid),CI_w1_Hz_pos(~BSvalid),'ro');
+    leglbls={'Bloch-Siegert valid','Bloch-Siegert invalid'};
+    legend(leglbls,'Location','southeast');
+end
+title('Measured B_1 vs Amplitude Setting'); 
+xlabel('F3 ampl');
+ylabel('B_1 (Hz)');
+
+end
