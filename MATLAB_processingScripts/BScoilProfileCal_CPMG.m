@@ -47,9 +47,9 @@ offsetsHz=tableVals{1}';
 Ampls=tableVals{2}';
 
 disp('Reading in Bloch-Siegert pulse duration and number of loops from header...')
-[~,seqPars]=Read_TNT_seqPars(fname,true);
-BStime = seqPars.Dashboard.Sequence.BSpw;
-numechoes = seqPars.Dashboard.Sequence.Nloops;
+seqPars=Read_Tecmag_Header_Var(fname,{'Nechoes','Nloops','BSpw'});
+BStime=seqPars{3};
+numechoes=seqPars{2};
 
 % % Check that rawdata has dimensions (spectral,offset,TE)
 % if size(rawdata,2)~=length(offsetsHz) && size(rawdata,2)==length(delaysS)

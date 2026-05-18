@@ -28,9 +28,9 @@ XoffsetHz=abs(hdr.ob_freq(3)*1e6);
 Ampls=tableVals{1}';
 
 disp('Reading in Bloch-Siegert pulse duration and number of loops from header...')
-[~,seqPars]=Read_TNT_seqPars(fname,true);
-BStime = seqPars.Dashboard.Sequence.BSpw;
-numechoes = seqPars.Dashboard.Sequence.Nloops;
+seqPars=Read_Tecmag_Header_Var(fname,{'Nechoes','Nloops','BSpw'});
+BStime=seqPars{3};
+numechoes=seqPars{2};
 
 % % Check that rawdata has dimensions (spectral,offset,TE)
 % if size(rawdata,2)~=length(offsetsHz) && size(rawdata,2)==length(delaysS)
@@ -49,7 +49,7 @@ end
 
 % Double-check size of data: should be (npoints,Nechoes,Noffsets) 
 if size(rawdata,1) ~= hdr.acq_points
-    warning('Data was not formatted as (points) x (echoes) x (offsets)! Reshaping...')
+    warning('Data was not formatted as (points) x (echoes) x (amplitudes)! Reshaping...')
     rawdata = reshape(rawdata,hdr.acq_points,numechoes,[]);
 end
 
