@@ -1,5 +1,5 @@
 # Bloch-Siegert Calibration of Low-field MR Coils
-This repository contains Tecmag TNMR pulse sequence files for performing low-field MR coil calibration using Bloch-Siegert shifts, as well as processing code for the data.
+This repository contains Tecmag TNMR pulse sequence and data files for performing low-field MR coil calibration using Bloch-Siegert shifts, as well as processing code for the data.
 
 ## Citations
 Please cite the following papers if you use the pulse sequences and/or code provided:
@@ -7,7 +7,7 @@ Please cite the following papers if you use the pulse sequences and/or code prov
 ## Repository Contents
 
 ### `TNMR_sequenceFiles/`
-Tecmag TNMR pulse sequence files (`.tnt`) and their associated parameter files (`.tps`) for performing Bloch-Siegert coil calibration experiments on a low-field MR system.
+Tecmag TNMR data files (`.tnt`) and their associated pulse sequence files (`.tps`) for performing Bloch-Siegert coil calibration experiments on a low-field MR system.
 
 | File pair | Description |
 |---|---|
