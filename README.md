@@ -1,34 +1,20 @@
 # Bloch-Siegert Calibration of Low-field MR Coils
 This repository contains Tecmag TNMR pulse sequence and data files for performing low-field MR coil calibration using Bloch-Siegert shifts, as well as processing code for the data.
 
+> **Note:** The contents of this repository were originally designed for use on a 6.5 mT low-field MR system.
+
 ## Citations
 Please cite the following papers if you use the pulse sequences and/or code provided:
 
 ## Repository Contents
 
 ### `TNMR_sequenceFiles/`
-Tecmag TNMR data files (`.tnt`) and their associated pulse sequence files (`.tps`) for performing Bloch-Siegert coil calibration experiments on a low-field MR system.
+Tecmag TNMR data files (`.tnt`) and their associated pulse sequence files (`.tps`) for performing Bloch-Siegert coil calibration experiments on a low-field MR system. The provided pulse sequence files can be used for two main functions:
 
-| File pair | Description |
-|---|---|
-| `BS1HprofileCal_ActiveTR` | Single spin-echo sequence for mapping the <sup>1</sup>H transmit coil profile as a function of offset frequency |
-| `BS1HprofileCalMultiEcho_ActiveTR` | Rapid multi-echo variant of the <sup>1</sup>H coil profile calibration sequence |
-| `BScalXcoil_ActiveTR` | Single spin-echo sequence for calibrating the X-nuclear transmit coil amplitude |
-| `BScalXcoilMultiEcho_ActiveTR` | Rapid multi-echo variant of the X-nuclear coil calibration sequence |
+1. Calibration of an X-nuclear coil in a dual-tuned <sup>1</sup>H/X probe, using Bloch-Siegert shifts detected on <sup>1</sup>H
+2. Off-resonance transmit B₁ profile mapping of a <sup>1</sup>H coil, using Bloch-Siegert shifts
 
-In all sequences an off-resonance Bloch-Siegert pulse is applied during the echo period. The resulting signal phase encodes the local B₁ field strength via the Bloch-Siegert shift.
-
----
+See the [README](TNMR_sequenceFiles/README.md) in that subfolder for details.
 
 ### `MATLAB_processingScripts/`
-MATLAB functions for loading and processing Bloch-Siegert calibration data acquired with the sequences above.
-
-| Script | Description |
-|---|---|
-| `BScoilProfileCal.m` | Processes <sup>1</sup>H coil profile data from the single spin-echo sequence. Returns the measured B₁ amplitude (Hz) and, optionally, corrected pulse amplitudes targeting a desired B₁, as a function of offset frequency. |
-| `BScoilProfileCal_CPMG.m` | Same as above, adapted for the CPMG multi-echo acquisition. |
-| `BSXcoilCal.m` | Processes X-nuclear coil calibration data from the single spin-echo sequence. Returns the measured B₁ amplitude as a function of pulse amplitude (linear scale factor). |
-| `BSXcoilCal_CPMG.m` | Same as above, adapted for the CPMG multi-echo acquisition. |
-
-#### `MATLAB_processingScripts/TNMRfileloadScripts/`
-Helper functions for parsing Tecmag `.tnt` data files. Used internally by the calibration scripts above; these do not need to be called directly. See the [README](MATLAB_processingScripts/TNMRfileloadScripts/README.md) in that subfolder for details.
+MATLAB functions for loading and processing Bloch-Siegert calibration data acquired with the sequences above, including helper functions for parsing Tecmag `.tnt` data files. See the [README](MATLAB_processingScripts/README.md) in that subfolder for details.
